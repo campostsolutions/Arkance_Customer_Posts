@@ -20,6 +20,7 @@ vendorUrl = "https://www.priminer.de/en";
 legal = "Copyright (C) 2012-2026 by Autodesk, Inc.";
 certificationLevel = 2;
 minimumRevision = 45917;
+postName = "priminer828d";
 
 if (!longDescription) {
   longDescription = subst("Generic post for %1. Note that the post will use D1 always for the tool length compensation as this is how most users work.", description);
