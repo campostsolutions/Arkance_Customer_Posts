@@ -2526,7 +2526,7 @@ writeComment("PROGRAMMER       : " + getGlobalParameterSafe("username"));
 writeComment("DATE CREATED     : " + getGlobalParameterSafe("generated-at"));
 writeComment("SOFTWARE         : " + getGlobalParameterSafe("generated-by"));
 writeComment("POST             : " + localize("Priminer 828D"));
-writeComment("POST VERSION     : " + localize("10.2"));
+writeComment("POST VERSION     : " + localize("10.3"));
 writeComment("MACHINE          : " + vendor + " " + model + " " + mDescription);
 writeComment("PROGRAM STATE    : " + localize("UNPROVEN"));
 writeComment("*******************************************************");
@@ -3965,4 +3965,5 @@ settings.supportsTCP = false; // this postprocessor does not support TCP
 #   T e s t   c h a n g e  
  #   A n o t h e r   t e s t  
  #   T e s t   3  
+ #   T e s t   4  
  
