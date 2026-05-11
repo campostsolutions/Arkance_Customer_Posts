@@ -2538,14 +2538,7 @@ writeComment("DEF STRING[128] OUTPUT");
 writeComment("DEF REAL INSPTOL")
 }
 
-
-
-
-
-
-
-
-  
+ 
   // dump tool information
   if (getProperty("writeTools")) {
     if (false) { // set to true to use the post kernel version of the tool list
