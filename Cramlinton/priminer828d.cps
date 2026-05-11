@@ -2526,7 +2526,7 @@ writeComment("PROGRAMMER       : " + getGlobalParameterSafe("username"));
 writeComment("DATE CREATED     : " + getGlobalParameterSafe("generated-at"));
 writeComment("SOFTWARE         : " + getGlobalParameterSafe("generated-by"));
 writeComment("POST             : " + localize("Priminer 828D"));
-writeComment("POST VERSION     : " + localize("10.0"));
+writeComment("POST VERSION     : " + localize("10.1"));
 writeComment("MACHINE          : " + vendor + " " + model + " " + mDescription);
 writeComment("PROGRAM STATE    : " + localize("UNPROVEN"));
 writeComment("*******************************************************");
@@ -3962,3 +3962,5 @@ function getProbingArguments(cycle, singleLine) {
 
 // Siemens 828d does not support TCP
 settings.supportsTCP = false; // this postprocessor does not support TCP
+#   T e s t   c h a n g e  
+ 
