@@ -113,7 +113,7 @@ properties = {
     description: "Writes operation notes as comments in the outputted code.",
     group      : "formats",
     type       : "boolean",
-    value      : false,
+    value      : true,
     scope      : "post"
   },
   useIncreasedDecimals: {
@@ -251,7 +251,7 @@ properties = {
     description: "Specifies that the machine moves to the home position in XY at the end of the program.",
     group      : "homePositions",
     type       : "boolean",
-    value      : false,
+    value      : true,
     scope      : "post"
   }
 };
@@ -445,6 +445,7 @@ function onOpen() {
   writeWorkPiece();
   writeBlock(gFormat.format(64)); // continuous-path mode
   validateCommonParameters();
+   cancelWorkPlane(true);
 }
 
 function formatOutputVariables() {
@@ -575,8 +576,12 @@ function onSection() {
     }
   }
 
+
   writeln("");
   var comment = formatComment(getParameter("operation-comment", "")).replace(settings.comments.prefix, "");
+     if (getProperty("useGrouping")) {
+    writeBlock("GROUP_BEGIN(0, " + "\"" + comment + "\"" + ", 0, 0)");
+  }
   writeBlock(comment ? "MSG (" + "\"" + comment + "\"" + ")" : "");
 
   if (getProperty("showNotes")) {
@@ -627,9 +632,7 @@ function onSection() {
   var isRequired = insertToolCall || state.retractedZ || (!isFirstSection() && getPreviousSection().isMultiAxis());
   writeInitialPositioning(initialPosition, isRequired);
 
-  if (getProperty("useGrouping")) {
-    writeBlock("GROUP_BEGIN(0, " + "\"" + comment + "\"" + ", 0, 0)");
-  }
+ 
   writeBlock ("MSG (" + "\"" + comment + "\")");
   setCoolant(tool.coolant);
 
@@ -1959,7 +1962,7 @@ function positionABC(abc, force) {
     }
     onCommand(COMMAND_UNLOCK_MULTI_AXIS);
     gMotionModal.reset();
-    writeBlock(gMotionModal.format(0), a, b, c);
+    //writeBlock(gMotionModal.format(0), a, b, c);
     setCurrentABC(abc); // required for machine simulation
     machineSimulation({a:abc.x, b:abc.y, c:abc.z, coordinates:MACHINE});
   }
@@ -1976,6 +1979,7 @@ function writeWCS(section, wcsIsRequired) {
     }
     writeStartBlocks(wcsIsRequired, function () {
       writeBlock(section.wcs);
+
     });
     currentWorkOffset = section.workOffset;
   }
