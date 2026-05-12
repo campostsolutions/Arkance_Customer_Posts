@@ -2566,7 +2566,7 @@ function writeProgramHeader() {
     writeComment("SOFTWARE         : " + getGlobalParameterSafe("generated-by"));
     writeComment("POST             : " + localize("Priminer 828D"));
     writeComment("POST VERSION     : " + localize("30"));
-    // dummy change 6
+    // dummy change 7
     writeComment("MACHINE          : " + vendor + " " + model + " " + mDescription);
     writeComment("PROGRAM STATE    : " + localize("UNPROVEN"));
     writeComment("*******************************************************");
