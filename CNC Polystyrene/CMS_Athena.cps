@@ -320,7 +320,75 @@ function onSection() {
   var hOffset = isRequired ? hFormat.format(tool.lengthOffset) : "";
   writeInitialPositioning(initialPosition, isRequired, "", hOffset);
 }
+// >>>>> INCLUDED FROM include_files/rewind.cpi
+function onMoveToSafeRetractPosition() {
+  if (!getSetting("allowCancelTCPBeforeRetracting", false)) {
+    writeRetract(Z);
+  }
+  if (state.tcpIsActive) { // cancel TCP so that tool doesn't follow rotaries
+    if (typeof setTCP == "function") {
+      setTCP(false);
+    } else {
+      disableLengthCompensation(false);
+    }
+  }
+  writeRetract(Z);
+  if (getSetting("retract.homeXY.onIndexing", false)) {
+    writeRetract(settings.retract.homeXY.onIndexing);
+  }
+}
 
+/** Rotate axes to new position above reentry position */
+function onRotateAxes(_x, _y, _z, _a, _b, _c) {
+  // position rotary axes
+  xOutput.disable();
+  yOutput.disable();
+  zOutput.disable();
+  if (typeof unwindABC == "function") {
+    unwindABC(new Vector(_a, _b, _c), false);
+  }
+  onRapid5D(_x, _y, _z, _a, _b, _c);
+  setCurrentABC(new Vector(_a, _b, _c));
+  machineSimulation({a:_a, b:_b, c:_c, coordinates:MACHINE});
+  xOutput.enable();
+  yOutput.enable();
+  zOutput.enable();
+  forceXYZ();
+}
+
+/** Return from safe position after indexing rotaries. */
+function onReturnFromSafeRetractPosition(_x, _y, _z) {
+  if (!machineConfiguration.isHeadConfiguration()) {
+    writeInitialPositioning(new Vector(_x, _y, _z), true);
+    if (highFeedMapping != HIGH_FEED_NO_MAPPING) {
+      onLinear5D(_x, _y, _z, getCurrentDirection().x, getCurrentDirection().y, getCurrentDirection().z, highFeedrate);
+    } else {
+      onRapid5D(_x, _y, _z, getCurrentDirection().x, getCurrentDirection().y, getCurrentDirection().z);
+    }
+    machineSimulation({x:_x, y:_y, z:_z, a:getCurrentDirection().x, b:getCurrentDirection().y, c:getCurrentDirection().z});
+  } else {
+    if (tcp.isSupportedByOperation) {
+      if (typeof setTCP == "function") {
+        setTCP(true);
+      } else {
+        writeBlock(getOffsetCode(), hFormat.format(tool.lengthOffset));
+      }
+    }
+    forceXYZ();
+    xOutput.reset();
+    yOutput.reset();
+    zOutput.disable();
+    if (highFeedMapping != HIGH_FEED_NO_MAPPING) {
+      onLinear(_x, _y, _z, highFeedrate);
+    } else {
+      onRapid(_x, _y, _z);
+    }
+    machineSimulation({x:_x, y:_y});
+    zOutput.enable();
+    invokeOnRapid(_x, _y, _z);
+  }
+}
+// <<<<< INCLUDED FROM include_files/rewind.cpi
 function setTCP(_tcp) {
   if (state.tcpIsActive == _tcp) {
     return;
@@ -1602,7 +1670,76 @@ function positionABC(abc, force) {
   }
 }
 // <<<<< INCLUDED FROM include_files/positionABC.cpi
-// >>>>> INCLUDED FROM include_files/writeWCS.cpi
+// >>>>> INCLUDED FROM include_files/unwindABC.cpi
+function unwindABC(abc) {
+  if (settings.unwind == undefined || machineConfiguration.isHeadConfiguration()) {
+    return;
+  }
+  if (settings.unwind.method != 1 && settings.unwind.method != 2) {
+    error(localize("Unsupported unwindABC method."));
+    return;
+  }
+
+  var axes = new Array(machineConfiguration.getAxisU(), machineConfiguration.getAxisV(), machineConfiguration.getAxisW());
+  var currentDirection = getCurrentDirection();
+  for (var i in axes) {
+    if (axes[i].isEnabled() && axes[i].isCyclic() && (settings.unwind.useAngle != "prefix" || settings.unwind.anglePrefix[axes[i].getCoordinate] != "")) {
+      var j = axes[i].getCoordinate();
+
+      // only use the active axis in calculations
+      var tempABC = new Vector(0, 0, 0);
+      tempABC.setCoordinate(j, abc.getCoordinate(j));
+      var tempCurrent = new Vector(0, 0, 0); // only use the active axis in calculations
+      tempCurrent.setCoordinate(j, currentDirection.getCoordinate(j));
+      var orientation = machineConfiguration.getOrientation(tempCurrent);
+
+      // get closest angle without respecting 'reset' flag
+      // and distance from previous angle to closest abc
+      var nearestABC = machineConfiguration.getABCByPreference(orientation, tempABC, ABC, PREFER_PREFERENCE, ENABLE_WCS);
+      var distanceABC = abcFormat.getResultingValue(Math.abs(Vector.diff(getCurrentDirection(), abc).getCoordinate(j)));
+
+      // calculate distance from calculated abc to closest abc
+      // include move to origin for G28 moves
+      var distanceOrigin = 0;
+      if (settings.unwind.method == 2) {
+        distanceOrigin = abcFormat.getResultingValue(Math.abs(Vector.diff(nearestABC, abc).getCoordinate(j)));
+      } else { // closest angle
+        distanceOrigin = abcFormat.getResultingValue(Math.abs(getCurrentDirection().getCoordinate(j))) % 360; // calculate distance for unwinding axis
+        distanceOrigin = (distanceOrigin > 180) ? 360 - distanceOrigin : distanceOrigin; // take shortest route to 0
+        distanceOrigin += abcFormat.getResultingValue(Math.abs(abc.getCoordinate(j))); // add distance from 0 to new position
+      }
+
+      // determine if the axis needs to be rewound and rewind it if required
+      var revolutions = distanceABC / 360;
+      var angle = settings.unwind.method == 2 ? nearestABC.getCoordinate(j) : 0;
+      if (distanceABC > distanceOrigin && (settings.unwind.method == 2 || (revolutions > 1))) { // G28 method will move rotary, so make sure move is greater than 360 degrees
+        writeRetract(Z);
+        if (getSetting("retract.homeXY.onIndexing", false)) {
+          writeRetract(settings.retract.homeXY.onIndexing);
+        }
+        onCommand(COMMAND_UNLOCK_MULTI_AXIS);
+        var outputs = [aOutput, bOutput, cOutput];
+        outputs[j].reset();
+        writeBlock(
+          settings.unwind.codes,
+          settings.unwind.workOffsetCode ? settings.unwind.workOffsetCode + currentWorkOffset : "",
+          settings.unwind.useAngle == "true" ? outputs[j].format(angle) :
+            (settings.unwind.useAngle == "prefix" ? settings.unwind.anglePrefix[j] + abcFormat.format(angle) : "")
+        );
+        if (settings.unwind.resetG90) {
+          gAbsIncModal.reset();
+          writeBlock(gAbsIncModal.format(90));
+        }
+        outputs[j].reset();
+
+        // set the current rotary axis angle from the unwind block
+        currentDirection.setCoordinate(j, angle);
+        setCurrentDirection(currentDirection);
+      }
+    }
+  }
+}
+// <<<<< INCLUDED FROM include_files/unwindABC.cpi// >>>>> INCLUDED FROM include_files/writeWCS.cpi
 function writeWCS(section, wcsIsRequired) {
   if (section.workOffset != currentWorkOffset) {
     if (getSetting("workPlaneMethod.cancelTiltFirst", false) && wcsIsRequired) {
