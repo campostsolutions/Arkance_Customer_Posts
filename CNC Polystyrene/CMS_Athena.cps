@@ -118,7 +118,54 @@ properties = {
     ],
     value: "G79",
     scope: "post"
-  }
+  },
+  e200Value: {
+    title      : "E200",
+    description: "E200 variable value for UAO (User Axis Offset).",
+    group      : "Machine Variables",
+    type       : "number",
+    value      : 0,
+    scope      : "post"
+  },
+  e201Value: {
+    title      : "E201",
+    description: "E201 variable value for X position.",
+    group      : "Machine Variables",
+    type       : "number",
+    value      : 0,
+    scope      : "post"
+  },
+  e202Value: {
+    title      : "E202",
+    description: "E202 variable value for Y position.",
+    group      : "Machine Variables",
+    type       : "number",
+    value      : 0,
+    scope      : "post"
+  },
+  e203Value: {
+    title      : "E203",
+    description: "E203 variable value for Z position.",
+    group      : "Machine Variables",
+    type       : "number",
+    value      : 0,
+    scope      : "post"
+  },
+  e210Value: {
+    title      : "E210",
+    description: "E210 variable value for G79 Safe Z. This is the Z position for safe retract.",
+    group      : "Machine Variables",
+    type       : "number",
+    value      : 0,
+    scope      : "post"
+  },
+ useE210ForG79: {
+  title      : "Use E210 for G79 retract",
+  description: "Use E210 variable instead of explicit Z value",
+  group      : "Machine Variables",
+  type       : "boolean",
+  value      : true
+}
 };
 
 // wcs definiton
@@ -172,7 +219,7 @@ var gCycleModal = createOutputVariable({}, gFormat); // modal group 9 // G81, ..
 var gRetractModal = createOutputVariable({}, gFormat); // modal group 10 // G98-99
 var fourthAxisClamp = createOutputVariable({}, mFormat);
 var fifthAxisClamp = createOutputVariable({}, mFormat);
-
+var zFormat = createFormat({decimals: 3});
 var settings = {
   coolant: {
     // samples:
@@ -213,7 +260,7 @@ var settings = {
     optimizeType          : OPTIMIZE_AXIS // can be set to OPTIMIZE_NONE, OPTIMIZE_BOTH, OPTIMIZE_TABLES, OPTIMIZE_HEADS, OPTIMIZE_AXIS. 'undefined' uses legacy rotations
   },
   comments: {
-    permittedCommentChars: " abcdefghijklmnopqrstuvwxyz0123456789.,=_-", // letters are not case sensitive, use option 'outputFormat' below. Set to 'undefined' to allow any character
+    permittedCommentChars: " abcdefghijklmnopqrstuvwxyz0123456789.,=_-:*", // letters are not case sensitive, use option 'outputFormat' below. Set to 'undefined' to allow any character
     prefix               : "; ", // specifies the prefix for the comment
     suffix               : "", // specifies the suffix for the comment
     outputFormat         : "upperCase", // can be set to "upperCase", "lowerCase" and "ignoreCase". Set to "ignoreCase" to write comments without upper/lower case formatting
@@ -264,14 +311,16 @@ function onSection() {
   var newWorkOffset = isNewWorkOffset() || forceSectionRestart;
   var newWorkPlane = isNewWorkPlane() || forceSectionRestart || (typeof defineWorkPlane == "function" &&
     Vector.diff(defineWorkPlane(getPreviousSection(), false), defineWorkPlane(currentSection, false)).length > 1e-4);
-
+  //validateE210();
   if (insertToolCall || newWorkOffset || newWorkPlane || state.tcpIsActive || currentSection.isMultiAxis()) {
     setTCP(false);
     if (insertToolCall && !isFirstSection()) {
       onCommand(COMMAND_COOLANT_OFF); // turn off coolant before retract during tool change
       onCommand(COMMAND_STOP_SPINDLE); // stop spindle before retract during tool change
+      
     }
     writeRetract(Z); // retract
+    
     if (isFirstSection()) {
       cancelWorkPlane(machineConfiguration.isMultiAxisConfiguration() && settings.workPlaneMethod.useTiltedWorkplane);
       if (machineConfiguration.isMultiAxisConfiguration()) {
@@ -280,7 +329,11 @@ function onSection() {
       forceABC();
     } else {
       if (insertToolCall || newWorkPlane) {
+        writeBlock(hFormat.format(0)); // reset tool length offset to 0 before retract during tool change
         cancelWorkPlane();
+        writeBlock("(DIS,\"\")"); // cancel tool axis compensation, this is needed for some controls to cancel the tool axis compensation before retracting during multi-axis tool change or when changing the work plane
+        writeBlock("(UPR)"); // cancel tool axis compensation, this is needed for some controls to cancel the tool axis compensation before retracting during multi-axis tool change or when changing the work plane
+        writeBlock("(DAN)");
       }
     }
   }
@@ -319,6 +372,18 @@ function onSection() {
   var isRequired = insertToolCall || state.retractedZ || !state.lengthCompensationActive || (!isFirstSection() && getPreviousSection().isMultiAxis());
   var hOffset = isRequired ? hFormat.format(tool.lengthOffset) : "";
   writeInitialPositioning(initialPosition, isRequired, "", hOffset);
+}
+function isZNegativeUp() {
+  // If machine configuration exists, use it
+  if (machineConfiguration) {
+    var zAxis = machineConfiguration.getAxis(2); // Z axis
+    if (zAxis) {
+      return zAxis.isReversed(); // reversed = negative is up
+    }
+  }
+
+  // Fallback assumption (CMS Athena style)
+  return true;
 }
 // >>>>> INCLUDED FROM include_files/rewind.cpi
 function onMoveToSafeRetractPosition() {
@@ -722,9 +787,11 @@ function onCommand(command) {
     return;
   case COMMAND_START_SPINDLE:
     forceSpindleSpeed = false;
-    writeBlock(sOutput.format(spindleSpeed), mFormat.format(tool.clockwise ? 3 : 4));
+    writeBlock("/" + sOutput.format(spindleSpeed), mFormat.format(tool.clockwise ? 3 : 4));
     return;
   case COMMAND_LOAD_TOOL:
+    writeBlock(";(GTO,TC #)");
+    writeBlock("(DIS, \"" + tool.description + "\")");
     writeToolBlock("T" + toolFormat.format(tool.number), mFormat.format(6));
     writeComment(tool.comment);
 
@@ -773,11 +840,27 @@ function onCommand(command) {
     onUnsupportedCommand(command);
   }
 }
+function validateE210() {
+  var userZ = getProperty("e210Value");
+  warning("(E210," + userZ + ")"); // set E210 value
+  if (userZ == 0 && getProperty("safePositionMethod") == "G79") {
+    error(localize("E210 value is not set in the post processor properties, which may cause collisions. Please set a proper value for E210."));
+  }
+  if (hasParameter("operation:clearanceHeight")) {
+    var fusionZ = getParameter("operation:clearanceHeight");
+    var negativeUp = isZNegativeUp();
+    var unsafe = negativeUp ? (userZ > fusionZ) : (userZ < fusionZ);
+    if (unsafe) {
+      warning("E210 is not safe relative to Fusion clearance height.");
+    }
+  }
+}
+
 
 function writeRetract() {
   var retract = getRetractParameters.apply(this, arguments);
   if (retract && retract.words.length > 0) {
-    if (typeof cancelWCSRotation == "function" && getSetting("retract.cancelRotationOnRetracting", false)) { // cancel rotation before retracting
+    if (typeof cancelWCSRotation == "function" && getSetting("retract.cancelRotationOnRetracting", false)) {
       cancelWCSRotation();
     }
     for (var i in retract.words) {
@@ -785,25 +868,50 @@ function writeRetract() {
       switch (retract.method) {
       case "G79":
         forceModals(gMotionModal, gAbsIncModal);
-        writeBlock(gMotionModal.format(0), gFormat.format(79), gAbsIncModal.format(91), words);
+        var g79Words = words.slice();
+        
+        // FIX 1: Retrieve the variables properly
+        var useE210 = getProperty("useE210ForG79"); 
+        var e210Value = getProperty("e210Value");
+
+        for (var j = 0; j < g79Words.length; j++) {
+          if (g79Words[j].indexOf("Z") === 0) {
+            var userZ = machineConfiguration.getRetractPlane();
+            var zOutput = "";
+            var comment = "";
+
+            if (useE210) {
+              zOutput = "Z" + zFormat.format(e210Value);
+              comment = "(ZE210)";
+            } else {
+              zOutput = "Z" + zFormat.format(userZ);
+            }
+            g79Words[j] = zOutput + (useE210 ? " " + comment : "");
+          }
+        }
+        writeBlock(gMotionModal.format(0), gFormat.format(79), gAbsIncModal.format(91), g79Words);
         writeBlock(gAbsIncModal.format(90));
         break;
       default:
         error(subst(localize("Unsupported safe position method '%1'"), retract.method));
       }
+
+      // FIX 2: Pass the correctly fetched value to the Machine Simulator
       machineSimulation({
-        x          : retract.singleLine || words.indexOf("X") != -1 ? retract.positions.x : undefined,
-        y          : retract.singleLine || words.indexOf("Y") != -1 ? retract.positions.y : undefined,
-        z          : retract.singleLine || words.indexOf("Z") != -1 ? retract.positions.z : undefined,
+        x : retract.singleLine || words.indexOf("X") != -1 ? retract.positions.x : undefined,
+        y : retract.singleLine || words.indexOf("Y") != -1 ? retract.positions.y : undefined,
+        z : retract.singleLine || words.indexOf("Z") != -1 ? 
+            (retract.method == "G79" && getProperty("useE210ForG79") ? getProperty("e210Value") : retract.positions.z) 
+            : undefined,
         coordinates: MACHINE
       });
+
       if (retract.singleLine) {
         break;
       }
     }
   }
 }
-
 function onSectionEnd() {
   if (currentSection.isMultiAxis()) {
     writeBlock(gFeedModeModal.format(94)); // inverse time feed off
@@ -835,6 +943,7 @@ function onClose() {
   if (getSetting("retract.homeXY.onProgramEnd", false)) {
     writeRetract(settings.retract.homeXY.onProgramEnd);
   }
+  writeBlock(gMotionModal.format(0), gFormat.format(79), zOutput.format(0)); // G79 Z0 to retract to safe Z height, this is needed for some controls to retract without following the toolpath when the program ends
   writeBlock(mFormat.format(30)); // program end
 }
 
@@ -857,7 +966,7 @@ var sequenceNumber;
 var optionalSection = false;
 var currentWorkOffset;
 var forceSpindleSpeed = false;
-var operationNeedsSafeStart = false; // used to convert blocks to optional for safeStartAllOperations
+var operationNeedsSafeStart = true; // used to convert blocks to optional for safeStartAllOperations
 
 function activateMachine() {
   // disable unsupported rotary axes output
@@ -1938,20 +2047,23 @@ function writeProgramHeader() {
   var model = machineConfiguration.getModel();
   var mDescription = machineConfiguration.getDescription();
   if (getProperty("writeMachine") && (vendor || model || mDescription)) {
-    writeComment(localize("Machine"));
+   // writeComment(localize("Machine"));
     if (vendor) {
-      writeComment("  " + localize("vendor") + ": " + vendor);
+      writeComment(localize("vendor") + ": " + vendor);
     }
     if (model) {
-      writeComment("  " + localize("model") + ": " + model);
+      writeComment(localize("model") + ": " + model);
     }
     if (mDescription) {
-      writeComment("  " + localize("description") + ": " + mDescription);
+      //writeComment("  " + localize("description") + ": " + mDescription);
     }
-  }
 
-  // dump tool information
-  if (getProperty("writeTools")) {
+//-------------------added by CMS for Athena-------------------
+writeComment("Program Name : " + programName );
+writeComment("Description: " + programComment );
+writeComment("Date: " + Date);
+writeComment("");
+if (getProperty("writeTools")) {
     if (false) { // set to true to use the post kernel version of the tool list
       writeToolTable(TOOL_NUMBER_COL);
     } else {
@@ -1988,6 +2100,33 @@ function writeProgramHeader() {
       }
     }
   }
+writeComment("");
+writeBlock("(DAN)");
+writeBlock("(UPR)");
+writeBlock("(TCP)");
+writeBlock("G71");
+writeBlock("G600");
+writeComment("****************************");
+writeBlock("E200=" + getProperty("e200Value") + " ;ORIGIN");
+writeBlock("E201=" + getProperty("e201Value") + " ;X POSITION");
+writeBlock("E202=" + getProperty("e202Value") + " ;Y POSITION");
+writeBlock("E203=" + getProperty("e203Value") + " ;Z POSITION");
+writeBlock("");
+writeBlock("E210=" + getProperty("e210Value") + " ;G79 Safe Z Value, Edit as Required");
+writeComment("****************************");
+writeBlock("G0 G79 ZE210 ;Safe Z");
+writeComment("****************************");
+writeBlock("(UAO,E200)");
+writeBlock("(UTO,E200,XE201,YE202,ZE205)");
+writeComment("****************************");
+writeBlock("G356");
+
+
+
+  }
+
+  // dump tool information
+  
 }
 // <<<<< INCLUDED FROM include_files/writeProgramHeader.cpi
 
