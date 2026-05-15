@@ -881,8 +881,8 @@ function writeRetract() {
             var comment = "";
 
             if (useE210) {
-              zOutput = "Z" + zFormat.format(e210Value);
-              comment = "(ZE210)";
+              zOutput = "ZE210";
+              comment = "(Z" + zFormat.format(e210Value) + ")";
             } else {
               zOutput = "Z" + zFormat.format(userZ);
             }
