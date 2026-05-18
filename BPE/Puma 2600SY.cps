@@ -25,7 +25,7 @@
 //
 ///////////////////////////////////////////////////////////////////////////////
 
-description = "DN Solutions (Doosan) Mill/Turn with Fanuc 0i/31i control";
+description = "DN Solutions (Doosan) Puma 2600 SY";
 vendor = "DN Solutions (Doosan)";
 vendorUrl = "https://www.dn-solutions.com";
 legal = "Copyright (C) 2012-2026 by Autodesk, Inc.";
