@@ -409,14 +409,6 @@ properties = {
     value      : 1,
     scope      : "post"
   },
-  writeVersion: {
-    title      : "Write version",
-    description: "Write the version number in the header of the code.",
-    group      : "formats",
-    type       : "boolean",
-    value      : false,
-    scope      : "post"
-  },
   separateWordsWithSpace: {
     title      : "Separate words with space",
     description: "Adds spaces between words if 'yes' is selected.",
@@ -1181,14 +1173,7 @@ function onOpen() {
     return;
   }
 
-  if (getProperty("writeVersion")) {
-    if ((typeof getHeaderVersion == "function") && getHeaderVersion()) {
-      writeComment(localize("post version") + ": " + getHeaderVersion());
-    }
-    if ((typeof getHeaderDate == "function") && getHeaderDate()) {
-      writeComment(localize("post modified") + ": " + getHeaderDate());
-    }
-  }
+  writeComment(localize("FILE -") + " " + getProperty("fileName"));
 
   // dump machine configuration
   var vendor = machineConfiguration.getVendor();
