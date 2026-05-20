@@ -105,7 +105,7 @@ properties = {
     description: "Specifies that the shortest angular direction should be used.",
     group: "multiAxis",
     type: "boolean",
-    value: true,
+    value: false,
     scope: "post"
   },
   showNotes: {
@@ -183,7 +183,7 @@ properties = {
       { id: "54", title: "54 (BAC)" },
       { id: "192", title: "192 (Rotary angles)" }
     ],
-    value: "27",
+    value: "57",
     scope: "post"
   },
   cycle800SwivelDataRecord: {
@@ -191,7 +191,7 @@ properties = {
     description: "Specifies the label to use for the Swivel Data Record for CYCLE800.",
     group: "multiAxis",
     type: "string",
-    value: "T1-507510 B/C",
+    value: "TC1",
     scope: "post"
   },
   cycle800RetractMethod: {
@@ -204,7 +204,7 @@ properties = {
       { id: "1", title: "1 - retract in machine Z" },
       { id: "2", title: "2 - retract in machine Z, then XY" }
     ],
-    value: "0",
+    value: "1",
     scope: "post"
   },
   useExtendedCycles: {
@@ -814,17 +814,17 @@ function onCommand(command) {
       return;
     case COMMAND_LOCK_MULTI_AXIS:
       if (machineConfiguration.isMultiAxisConfiguration()) {
-        writeBlock(fourthAxisClamp.format(10)); // lock 4th axis
+      //  writeBlock(fourthAxisClamp.format(10)); // lock 4th axis
         if (machineConfiguration.getNumberOfAxes() > 4) {
-          writeBlock(fifthAxisClamp.format(20)); // lock 5th axis
+      //    writeBlock(fifthAxisClamp.format(20)); // lock 5th axis
         }
       }
       return;
     case COMMAND_UNLOCK_MULTI_AXIS:
       if (machineConfiguration.isMultiAxisConfiguration()) {
-        writeBlock(fourthAxisClamp.format(11)); // unlock 4th axis
+       // writeBlock(fourthAxisClamp.format(11)); // unlock 4th axis
         if (machineConfiguration.getNumberOfAxes() > 4) {
-          writeBlock(fifthAxisClamp.format(21)); // unlock 5th axis
+       //   writeBlock(fifthAxisClamp.format(21)); // unlock 5th axis
         }
       }
       return;
@@ -901,6 +901,8 @@ function onClose() {
       writeRetract(settings.retract.homeXY.onProgramEnd);
     }
   }
+  //set tool number to 0 to prevent unnecessary tool calls if the program is restarted
+  writeToolBlock("T0");
   if (typeof inspectionProcessSectionEnd == "function") {
     inspectionProcessSectionEnd();
   }
@@ -1833,8 +1835,10 @@ function setWorkPlane(abc) {
     forceABC();
     forceXYZ();
 
-    if (!currentSection.isMultiAxis()) {
+    if (!currentSection.isMultiAxis()){
+      if (getProperty("useTiltedWorkplane", true)) {
       onCommand(COMMAND_LOCK_MULTI_AXIS);
+      }
     }
     currentWorkPlaneABC = abc;
   });
@@ -1994,9 +1998,14 @@ function positionABC(abc, force) {
     if (getSetting("retract.homeXY.onIndexing", false)) {
       writeRetract(settings.retract.homeXY.onIndexing);
     }
-    onCommand(COMMAND_UNLOCK_MULTI_AXIS);
+    if (!getProperty("useTiltedWorkplane") && settings.workPlaneMethod.optimizeType == undefined) {
+      onCommand(COMMAND_UNLOCK_MULTI_AXIS);
+    }
     gMotionModal.reset();
-    //writeBlock(gMotionModal.format(0), a, b, c);
+    if (settings.workPlaneMethod.useTiltedWorkplane == false) {
+      //writeBlock(gMotionModal.format(0), a, b, c);
+      writeBlock(gMotionModal.format(0), gAbsIncModal.format(90), aOutput.format(0), cOutput.format(0));
+    }
     setCurrentABC(abc); // required for machine simulation
     machineSimulation({ a: abc.x, b: abc.y, c: abc.z, coordinates: MACHINE });
   }
