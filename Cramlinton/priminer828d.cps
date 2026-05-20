@@ -903,6 +903,7 @@ function onClose() {
   }
   //set tool number to 0 to prevent unnecessary tool calls if the program is restarted
   writeToolBlock("T0");
+  writeBlock(mFormat.format(6));
   if (typeof inspectionProcessSectionEnd == "function") {
     inspectionProcessSectionEnd();
   }
@@ -1981,6 +1982,7 @@ Matrix.getOrientationFromDirection = function (ijk) {
 // <<<<< INCLUDED FROM include_files/initialPositioning_siemens.cpi
 // >>>>> INCLUDED FROM include_files/positionABC.cpi
 function positionABC(abc, force) {
+
   if (!machineConfiguration.isMultiAxisConfiguration()) {
     error("Function 'positionABC' can only be used with multi-axis machine configurations.");
   }
@@ -2002,8 +2004,12 @@ function positionABC(abc, force) {
       onCommand(COMMAND_UNLOCK_MULTI_AXIS);
     }
     gMotionModal.reset();
+    gAbsIncModal.reset()
     if (settings.workPlaneMethod.useTiltedWorkplane == false) {
-      //writeBlock(gMotionModal.format(0), a, b, c);
+      gMotionModal.reset();
+      gAbsIncModal.reset()
+      aOutput.reset()
+      cOutput.reset()
       writeBlock(gMotionModal.format(0), gAbsIncModal.format(90), aOutput.format(0), cOutput.format(0));
     }
     setCurrentABC(abc); // required for machine simulation
