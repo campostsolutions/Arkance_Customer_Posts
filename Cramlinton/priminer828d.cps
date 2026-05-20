@@ -895,15 +895,15 @@ function onClose() {
   writeRetract(Z);
   setWorkPlane(new Vector(0, 0, 0)); // reset working plane
   cancelWorkPlane(true);
-
+writeToolBlock("T0");
+  writeBlock(mFormat.format(6));
   if (getProperty("useParkPosition")) {
     if (getSetting("retract.homeXY.onProgramEnd", false)) {
       writeRetract(settings.retract.homeXY.onProgramEnd);
     }
   }
   //set tool number to 0 to prevent unnecessary tool calls if the program is restarted
-  writeToolBlock("T0");
-  writeBlock(mFormat.format(6));
+  
   if (typeof inspectionProcessSectionEnd == "function") {
     inspectionProcessSectionEnd();
   }
