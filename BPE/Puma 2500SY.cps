@@ -1,4 +1,4 @@
-/**
+﻿/**
   Copyright (C) 2012-2026 by Autodesk, Inc.
   All rights reserved.
 
@@ -25,14 +25,14 @@
 //
 ///////////////////////////////////////////////////////////////////////////////
 
-description = "DN Solutions (Doosan) Puma 2500 SY";
+description = "DN Solutions (Doosan) Puma 2500SY/2600SY";
 vendor = "DN Solutions (Doosan)";
 vendorUrl = "https://www.dn-solutions.com";
 legal = "Copyright (C) 2012-2026 by Autodesk, Inc.";
 certificationLevel = 2;
 minimumRevision = 45909;
 
-longDescription = "DN Solutions (Doosan) lathe (Fanuc 0i and 31i control) post with support for mill-turn for use with Lynx and Puma.";
+longDescription = "DN Solutions (Doosan) Puma 2500SY/2600SY lathe (Fanuc 0i and 31i control) post with support for mill-turn.";
 
 extension = "nc";
 programNameIsInteger = true;
@@ -55,6 +55,7 @@ allowSpiralMoves = false;
 allowFeedPerRevolutionDrilling = true;
 highFeedrate = (unit == IN) ? 470 : 12000;
 
+
 // user-defined properties
 properties = {
   machineModel: {
@@ -63,13 +64,10 @@ properties = {
     group      : "configuration",
     type       : "enum",
     values     : [
-      {title:"Puma", id:"PUMA"},
-      {title:"Lynx", id:"LYNX"},
-      {title:"Lynx with Y-axis", id:"LYNX_YAXIS"},
-      {title:"Puma MX", id:"PUMA_MX"},
-      {title:"Puma SMX", id:"PUMA_SMX"}
+      {title:"Puma 2500SY", id:"PUMA_2500SY"},
+      {title:"Puma 2600SY", id:"PUMA_2600SY"}
     ],
-    value: "PUMA",
+    value: "PUMA_2500SY",
     scope: "post"
   },
   gotSecondarySpindle: {
@@ -129,6 +127,41 @@ properties = {
     value      : true,
     scope      : "post"
   },
+  runBarStop: {
+    title      : "Run bar stop",
+    description: "Specifies whether the bar stop should be run.",
+    group      : "Bar Stop",
+    type       : "boolean",
+    value      : true,
+    scope      : "post"
+  },
+  barToolStop: {
+    title      : "Tool Number",
+    description: "Defines the tool number for the bar stop.",
+    group      : "Bar Stop",
+    type       : "integer",
+    range      : [1, 999999999],
+    value      : 1242,
+    scope      : "post"
+  },
+  barSafeZ: {
+    title      : "Safe Z Position",
+    description: "Defines the safe Z distance for bar stop operation.",
+    group      : "Bar Stop",
+    type       : "spatial",
+    range      : [0, 99999],
+    value      : 50,
+    scope      : "post"
+  },
+  barStopZ: {
+    title      : "Stop Z Position",
+    description: "Defines the Z position for the bar stop operation.",
+    group      : "Bar Stop",
+    type       : "spatial",
+    range      : [0, 99999],
+    value      : 0.75,
+    scope      : "post"
+  },
   partCatcherPosition: {
     title      : "Sub spindle position for part catcher",
     description: "Defines the position of the sub spindle when the part catcher is activated.  A value of 0 will not move the subspindle.",
@@ -144,7 +177,7 @@ properties = {
     group       : "configuration",
     type        : "boolean",
     presentation: "yesno",
-    value       : true,
+    value       : false,
     scope       : "post"
   },
   maxTool: {
@@ -183,7 +216,7 @@ properties = {
     description: "The number at which to start the sequence numbers.",
     group      : "formats",
     type       : "integer",
-    value      : 1,
+    value      : 0,
     scope      : "post"
   },
   sequenceNumberIncrement: {
@@ -386,7 +419,7 @@ properties = {
   },
   useG400: {
     title      : "Use G400 for milling tools",
-    description: "Enable to output the G400 compensation block with milling/drilling operations. This option is only valid for the Puma MX and Puma SMX models.",
+    description: "Enable to output the G400 compensation block with milling/drilling operations. This option is not supported for the Puma 2500SY/2600SY models.",
     group      : "multiAxis",
     type       : "boolean",
     value      : false,
@@ -443,7 +476,7 @@ properties = {
   },
   useExtendedOffsets: {
     title      : "Use extended tool offsets",
-    description: "Select whether extended offsets are supported on the main tool holder, the lower turret, or both. 'Machine default' will enable extended offsets on the Puma main spindle and on both spindles for the Puma SMX.",
+    description: "Select whether extended offsets are supported on the main tool holder, the lower turret, or both. 'Machine default' disables extended offsets for the Puma 2500SY/2600SY models.",
     group      : "preferences",
     type       : "enum",
     values     : [
@@ -458,7 +491,7 @@ properties = {
   },
   useTCP: {
     title      : "Use TCP (G700) mode",
-    description: "Enable to use G700 Tool Center Point programming in multi-axis operations.  This option is only valid for the Puma MX and Puma SMX models.",
+    description: "Enable to use G700 Tool Center Point programming in multi-axis operations. This option is not supported for the Puma 2500SY/2600SY models.",
     group      : "multiAxis",
     type       : "boolean",
     value      : false,
@@ -769,9 +802,9 @@ function getCode(code, spindle) {
   case "AUTO_AIR_OFF":
     return 15;
   case "LOCK_MULTI_AXIS":
-    return (spindle == SPINDLE_MAIN) ? 89 : 189;
+   // return (spindle == SPINDLE_MAIN) ? 89 : 189;
   case "UNLOCK_MULTI_AXIS":
-    return (spindle == SPINDLE_MAIN) ? 90 : 190;
+    //return (spindle == SPINDLE_MAIN) ? 90 : 190;
   case "CLAMP_CHUCK":
     return (spindle == SPINDLE_MAIN) ? 68 : 168;
   case "UNCLAMP_CHUCK":
@@ -816,11 +849,7 @@ function getCode(code, spindle) {
       machineState.mainSpindleIsActive = false;
       machineState.subSpindleIsActive = true;
       machineState.liveToolIsActive = false;
-      if (getProperty("machineModel") == "PUMA_MX" || getProperty("machineModel") == "PUMA_SMX") {
-        return 21;  // Puma MX
-      } else {
-        return 13;  // Puma SY,...
-      }
+      return 13;  // Puma SY
     }
     break;
   case "RIGID_TAPPING":
@@ -914,8 +943,10 @@ function defineMachine() {
   gotMultiTurret = getProperty("gotMultiTurret");
   turret1GotYAxis = false;
   turret2GotYAxis = false;
-  if (getProperty("machineModel") == "PUMA") {
-    modelType = "Puma";
+
+  var machineModel = getProperty("machineModel");
+  if (machineModel == "PUMA_2500SY" || machineModel == "PUMA_2600SY") {
+    modelType = (machineModel == "PUMA_2500SY") ? "Puma 2500SY" : "Puma 2600SY";
     turret1GotYAxis = true;
     yAxisMinimum = toPreciseUnit(-50, MM); // specifies the minimum range for the Y-axis
     yAxisMaximum = toPreciseUnit(50, MM); // specifies the maximum range for the Y-axis
@@ -926,56 +957,11 @@ function defineMachine() {
     gotDoorControl = false;
     useCAxisSelectWithTurning = false;
     setProperty("useG400", false);
+    setProperty("useTCP", false);
     useMultiAxisFeatures = true;
     useExtendedOffsets = getProperty("useExtendedOffsets") == "default" ? "false" : getProperty("useExtendedOffsets");
-  } else if ((getProperty("machineModel") == "LYNX") || (getProperty("machineModel") == "LYNX_YAXIS")) {
-    modelType = "Lynx";
-    if (getProperty("machineModel") == "LYNX_YAXIS") {
-      turret1GotYAxis = true;
-      yAxisMinimum = toPreciseUnit(-52.5, MM); // specifies the minimum range for the Y-axis
-      yAxisMaximum = toPreciseUnit(52.5, MM); // specifies the maximum range for the Y-axis
-    } else {
-      turret1GotYAxis = false;
-      yAxisMinimum = toPreciseUnit(0, MM); // specifies the minimum range for the Y-axis
-      yAxisMaximum = toPreciseUnit(0, MM); // specifies the maximum range for the Y-axis
-    }
-    xAxisMinimum = getProperty("xAxisMinimum"); // specifies the maximum range for the X-axis (RADIUS MODE VALUE)
-    gotBAxis = false; // B-axis always requires customization to match the machine specific functions for doing rotations
-    bAxisIsManual = true; // B-axis is manually set and not programmable
-    gotPolarInterpolation = true; // specifies if the machine has XY polar interpolation capabilities
-    gotDoorControl = false;
-    useCAxisSelectWithTurning = false;
-    setProperty("useG400", false);
-    useMultiAxisFeatures = false;
-    useExtendedOffsets = getProperty("useExtendedOffsets") == "default" ? "false" : getProperty("useExtendedOffsets");
-  } else if (getProperty("machineModel") == "PUMA_MX") {
-    modelType = "Puma MX";
-    turret1GotYAxis = true;
-    yAxisMinimum = toPreciseUnit(-115, MM); // specifies the minimum range for the Y-axis
-    yAxisMaximum = toPreciseUnit(115, MM); // specifies the maximum range for the Y-axis
-    xAxisMinimum = getProperty("xAxisMinimum") == 0 ? toPreciseUnit(-125, MM) : getProperty("xAxisMinimum"); // specifies the maximum range for the X-axis (RADIUS MODE VALUE)
-    gotBAxis = true; // B-axis always requires customization to match the machine specific functions for doing rotations
-    bAxisIsManual = false; // B-axis is manually set and not programmable
-    gotPolarInterpolation = true; // specifies if the machine has XY polar interpolation capabilities
-    gotDoorControl = false;
-    useCAxisSelectWithTurning = false;
-    useMultiAxisFeatures = true;
-    useExtendedOffsets = getProperty("useExtendedOffsets") == "default" ? "main" : getProperty("useExtendedOffsets");
-  } else if (getProperty("machineModel") == "PUMA_SMX") {
-    modelType = "Puma SMX";
-    turret1GotYAxis = true;
-    yAxisMinimum = toPreciseUnit(-115, MM); // specifies the minimum range for the Y-axis
-    yAxisMaximum = toPreciseUnit(115, MM); // specifies the maximum range for the Y-axis
-    xAxisMinimum = getProperty("xAxisMinimum") == 0 ? toPreciseUnit(-125, MM) : getProperty("xAxisMinimum"); // specifies the maximum range for the X-axis (RADIUS MODE VALUE)
-    gotBAxis = true; // B-axis always requires customization to match the machine specific functions for doing rotations
-    bAxisIsManual = false; // B-axis is manually set and not programmable
-    gotPolarInterpolation = true; // specifies if the machine has XY polar interpolation capabilities
-    gotDoorControl = false;
-    useMultiAxisFeatures = true;
-    useCAxisSelectWithTurning = false;
-    useExtendedOffsets = getProperty("useExtendedOffsets") == "default" ? "both" : getProperty("useExtendedOffsets");
   } else {
-    error(localize("Machine type must be 'Puma', 'Lynx', 'Lynx with Y-Axis', 'Puma MX', or 'Puma SMX'"));
+    error(localize("Machine type must be 'Puma 2500SY' or 'Puma 2600SY'"));
   }
 
   // define B-axis
@@ -997,7 +983,7 @@ function defineMachine() {
 
 function activateMachine(section) {
   // TCP setting
-  operationSupportsTCP = section.isMultiAxis() && getProperty("useTCP") && (getProperty("machineModel") == "PUMA_MX" || getProperty("machineModel") == "PUMA_SMX");
+  operationSupportsTCP = false;
 
   // handle multiple turrets
   var turret = 1;
@@ -1104,6 +1090,41 @@ function activateMachine(section) {
 
   return turret;
 }
+function startUpBlock() {
+  // Start Up Block - Operator needs to set L2P1Z and L2P2Z values, and may need to set X and Z values depending on machine configuration and starting position of the tool
+  writeln (" ");
+  writeln(formatSequenceNumber() + formatComment(localize("SETTING PARAMETERS")));
+  writeBlock(gFormat.format(40),gFormat.format(80));
+  writeBlock(gFormat.format(10)+" L2 P1 Z?? (SET THIS VALUE)");
+  writeBlock(gFormat.format(10)+" L2 P2 Z?? (SET THIS VALUE)");
+  writeBlock(gFormat.format(130)+" X?? Z?? (SET THIS VALUE)");
+  writeBlock(gMotionModal.format(30),  "U" + xFormat.format(0), "W" + zFormat.format(0));
+  writeBlock(gFormat.format(28), "V" + yFormat.format(0), "B0");
+  writeln (" ");
+}
+function runBarStop() {
+  if (getProperty("runBarStop",true)) {
+      var safeZ = getProperty("barSafeZ", 0);
+      var stopZ = getProperty("barStopZ", 0);
+    writeBlock(" ");
+    writeln(formatSequenceNumber() + formatComment(localize("BAR STOP CYCLE")));
+    writeBlock(gFormat.format(40),gFormat.format(80),gFormat.format(99),gFormat.format(54),gFormat.format(18));
+    writeBlock(gMotionModal.format(30),  "U" + xFormat.format(0), "W" + zFormat.format(0));
+    writeBlock(gFormat.format(28), bOutput.format(0), "V" + yFormat.format(0));
+    writeBlock(mFormat.format(5) +"P11")
+    writeBlock("T" + toolFormat.format(getProperty("barToolStop")));
+    writeBlock(mFormat.format(getCode("INTERFERENCE_CHECK_OFF", SPINDLE_MAIN)));
+    writeBlock(gFormat.format(0) + zOutput.format(safeZ));
+    writeBlock(xOutput.format(0));
+    writeBlock(zOutput.format(stopZ));
+    writeBlock(" ");
+    writeBlock("M00(PULL TO STOP)");
+    writeBlock(" ");
+    writeBlock(gFormat.format(0) + zOutput.format(25));
+     writeBlock(gMotionModal.format(30),  "U" + xFormat.format(0), "W" + zFormat.format(0));
+    writeBlock("M01");
+  }
+}
 
 function onOpen() {
   if (getProperty("useRadius")) {
@@ -1111,11 +1132,6 @@ function onOpen() {
   }
   if (!getProperty("useSpindlePcodes")) {
     spOutput.disable();
-  }
-
-  if (getProperty("machineModel") == "PUMA_SMX") {
-    peckOutput.setNumberOfDecimals(unit == MM ? 4 : 5);
-    peckOutput.setMinDigitsRight(unit == MM ? 4 : 5);
   }
 
   // Copy certain properties into global variables
@@ -1173,7 +1189,18 @@ function onOpen() {
     return;
   }
 
-  writeComment(localize("FILE -") + " " + getProperty("fileName"));
+var now = new Date();
+
+writeComment("FILE - " + programId); 
+writeComment("PART-NO - " + getGlobalParameter("document-path"));
+writeComment("PART-ISS - "); 
+writeComment("OPNUM -"); 
+writeComment("CUST -")
+writeComment("DESC - ") 
+writeComment("PROVEN BY - " + getGlobalParameter("username" ));
+writeComment(" DATE - " + now.getDate() + "/" + (now.getMonth() + 1) + "/" +   
+  now.getFullYear());
+writeComment("SAVED - ")
 
   // dump machine configuration
   var vendor = machineConfiguration.getVendor();
@@ -1276,7 +1303,7 @@ function onOpen() {
     writeln("");
     writeln("N1 (START MAIN PROGRAM)");
   }
-
+/*
   writeBlock(
     gFormat.format(0),
     gFormat.format(18),
@@ -1287,18 +1314,13 @@ function onOpen() {
     gFormat.format(99),
     gotSecondarySpindle ? mFormat.format(getCode("INTERFERENCE_CHECK_OFF", SPINDLE_MAIN)) : ""
   );
+  */
   onCommand(COMMAND_CLOSE_DOOR);
 
   if (getProperty("gotChipConveyor")) {
     onCommand(COMMAND_START_CHIP_TRANSPORT);
   }
 
-  // SMX requires the C-axes to be disabled at start of program
-  if (getProperty("machineModel") == "PUMA_SMX") {
-    cAxisEngageModal.reset();
-    writeBlock(cAxisEngageModal.format(getCode("DISABLE_C_AXIS", getSpindle(PART))));
-    writeBlock(cAxisEngageModal.format(getCode("DISABLE_C_AXIS", getSecondarySpindle())));
-  }
 
   // automatically eject part at end of program
   if (getProperty("autoEject") != "false") {
@@ -1316,6 +1338,13 @@ function onOpen() {
     machineState.subChuckIsClamped = true;
     break;
   }
+  bOutput.reset()
+
+  startUpBlock();
+  
+  if (getProperty("runBarStop", true)) {
+    runBarStop();
+  } 
 }
 
 function onComment(message) {
@@ -2040,16 +2069,16 @@ function onSection() {
         onCommand(COMMAND_STOP_SPINDLE);
         forceUnlockMultiAxis();
         onCommand(COMMAND_UNLOCK_MULTI_AXIS);
-        if ((tempSpindle != SPINDLE_LIVE) && !getProperty("optimizeCAxisSelect") && (getProperty("machineModel") != "PUMA_SMX")) {
+        if ((tempSpindle != SPINDLE_LIVE) && !getProperty("optimizeCAxisSelect")) {
           cAxisEngageModal.reset();
           writeBlock(cAxisEngageModal.format(getCode("DISABLE_C_AXIS", getSpindle(PART))));
-          if (machineState.spindlesAreAttached || (getProperty("machineModel") == "PUMA_SMX")) {
+          if (machineState.spindlesAreAttached) {
             writeBlock(cAxisEngageModal.format(getCode("DISABLE_C_AXIS", getSecondarySpindle())));
           }
         }
       } else {
         if (tool.clockwise != getPreviousSection().getTool().clockwise) {
-          forceSpindle = (getProperty("machineModel") != "PUMA_SMX");
+          forceSpindle = true;
           if (forceTurningMode) {
             cAxisEngageModal.reset();
             writeBlock(cAxisEngageModal.format(getCode("DISABLE_C_AXIS", getSpindle(PART))));
@@ -2067,6 +2096,9 @@ function onSection() {
     mInterferModal.reset();
     if (gotSecondarySpindle) {
       writeBlock(mInterferModal.format(getCode("INTERFERENCE_CHECK_OFF", getSpindle(PART))));
+    }
+    if (newSpindle) {
+      onCommand(COMMAND_STOP_SPINDLE);
     }
     if (getProperty("optionalStop")) {
       onCommand(COMMAND_OPTIONAL_STOP);
@@ -2098,15 +2130,11 @@ function onSection() {
 
   // Position all axes at home
   if (insertToolCall && !machineState.stockTransferIsActive) {
-    if (getProperty("machineModel") != "PUMA_SMX" || currentTurret == 2) {
-      moveSubSpindle(HOME, 0, 0, true, "SUB SPINDLE RETURN", false);
-    }
+   // moveSubSpindle(HOME, 0, 0, true, "SUB SPINDLE RETURN", false);
     goHome();
 
     // Stop the spindle
-    if (newSpindle) {
-      onCommand(COMMAND_STOP_SPINDLE);
-    }
+ 
   }
 
   // wcs
@@ -2180,12 +2208,7 @@ function onSection() {
       }
       writeBlock(wcsOut);
       if (!machineState.spindlesAreAttached) {
-        if (getProperty("machineModel") == "PUMA_SMX") {
-          writeBlock(feedMode, gPlaneModal.format(plane));
-          writeBlock(cAxisEngageModal.format(getCode("ENABLE_C_AXIS", getSpindle(PART))));
-        } else {
-          writeBlock(feedMode, gPlaneModal.format(plane), cAxisEngageModal.format(getCode("ENABLE_C_AXIS", getSpindle(PART))));
-        }
+        writeBlock(feedMode, gPlaneModal.format(plane), cAxisEngageModal.format(getCode("ENABLE_C_AXIS", getSpindle(PART))));
         onCommand(COMMAND_UNLOCK_MULTI_AXIS);
         unwindCAxis();
         if (!machineState.usePolarInterpolation && !machineState.usePolarCoordinates && !currentSection.isMultiAxis()) {
@@ -2215,7 +2238,7 @@ function onSection() {
       onCommand(COMMAND_UNLOCK_MULTI_AXIS);
       writeBlock(wcsOut);
       writeBlock(feedMode, gPlaneModal.format(18),
-        (getProperty("machineModel") != "PUMA_SMX" || useCAxisSelectWithTurning) ? cAxisEngageModal.format(getCode("DISABLE_C_AXIS", getSpindle(PART))) : "");
+        cAxisEngageModal.format(getCode("DISABLE_C_AXIS", getSpindle(PART))));
     } else {
       if (wcsOut) {
         writeBlock(wcsOut);
@@ -2685,12 +2708,13 @@ function setPolarInterpolation(activate) {
 }
 
 function goHome() {
-  writeBlock(gMotionModal.format(0), gFormat.format(28), "U" + xFormat.format(0), conditional(gotYAxis, "V" + yFormat.format(0)));
+ // writeBlock(gMotionModal.format(0), gFormat.format(28), "U" + xFormat.format(0), conditional(gotYAxis, "V" + yFormat.format(0)));
   if (!machineState.isPrepositioned) {
     switch (getProperty("homeMethodZ")) {
     case "G28":
     case "G30":
-      writeBlock(gMotionModal.format(0), gFormat.format(getProperty("homeMethodZ") == "G28" ? 28 : 30), "W" + zFormat.format(0));
+      writeBlock(gMotionModal.format(0), gFormat.format(28), "V" + yFormat.format(0));
+      writeBlock(gMotionModal.format(0), gFormat.format(30), "U" + xFormat.format(0), "W" + zFormat.format(0));
       zOutput.reset();
       break;
     case "G53":
@@ -3158,28 +3182,6 @@ function writeToolCall(_tool) {
   }
   gMotionModal.reset();
 
-  if (getProperty("machineModel") == "PUMA_MX" || getProperty("machineModel") == "PUMA_SMX") {
-    // preselect first tool or when turret changes back to 1
-    if ((isFirstSection() || (currentTurret == 1 && activeTurret == 2)) && (currentTurret != 2)) {
-      writeBlock("T" + toolFormat.format(_tool.number * offsetFactor));
-    }
-    if (currentTurret != 2) {
-      writeBlock(mFormat.format(6), "T" + toolFormat.format(_tool.number * offsetFactor));
-      var nextTool = getNextTool(_tool.number);
-      if (nextTool) {
-        if (nextTool.turret != 2) {
-          writeBlock("T" + toolFormat.format(nextTool.number * offsetFactor), formatComment("NEXT TOOL"));
-        }
-      } else {
-        // preload first tool
-        var section = getSection(0);
-        var firstToolNumber = section.getTool().number;
-        if ((_tool.number != firstToolNumber) && (section.getTool().turret != 2)) {
-          writeBlock("T" + toolFormat.format(firstToolNumber * offsetFactor), formatComment("NEXT TOOL"));
-        }
-      }
-    }
-  }
   currentToolCode = _tool.number * offsetFactor + compensationOffset;
   writeBlock("T" + toolFormat.format(currentToolCode));
   if (_tool.comment) {
@@ -3259,12 +3261,7 @@ function onCycle() {
       if (!getProperty("optimizeCAxisSelect")) {
         cAxisEngageModal.reset();
       }
-      if (getProperty("machineModel") == "PUMA_SMX") {
-        writeBlock(feedMode, gPlaneModal.format(plane));
-        writeBlock(cAxisEngageModal.format(getCode("DISABLE_C_AXIS", getSpindle(PART))));
-      } else {
-        writeBlock(feedMode, gPlaneModal.format(18), cAxisEngageModal.format(getCode("DISABLE_C_AXIS", getSpindle(PART))));
-      }
+      writeBlock(feedMode, gPlaneModal.format(18), cAxisEngageModal.format(getCode("DISABLE_C_AXIS", getSpindle(PART))));
       writeBlock(mFormat.format(getCode("DISABLE_C_AXIS", getSecondarySpindle())));
     }
 
@@ -4580,10 +4577,8 @@ function onClose() {
   if (machineState.tailstockIsActive) {
     engageTailStock(false);
   } else {
-    if (getProperty("machineModel") != "PUMA_SMX") {
-      gMotionModal.reset();
-      moveSubSpindle(HOME, 0, 0, true, "SUB SPINDLE RETURN", false);
-    }
+    gMotionModal.reset();
+   // moveSubSpindle(HOME, 0, 0, true, "SUB SPINDLE RETURN", false);
   }
 
   if (!getProperty("optimizeCAxisSelect")) {
