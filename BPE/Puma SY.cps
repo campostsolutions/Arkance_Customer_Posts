@@ -32,7 +32,7 @@ legal = "Copyright (C) 2012-2026 by Autodesk, Inc.";
 certificationLevel = 2;
 minimumRevision = 45909;
 
-longDescription = "DN Solutions (Doosan) Puma 2500SY/2600SY lathe (Fanuc 0i and 31i control) post with support for mill-turn.";
+longDescription = "DN Solutions (Doosan) Puma 2500SY/2600SY lathe (Fanuc 0i and 18i control) post with support for mill-turn.";
 
 extension = "nc";
 programNameIsInteger = true;
@@ -111,20 +111,12 @@ properties = {
     value      : false,
     scope      : "post"
   },
-  useSpindlePcodes: {
-    title      : "Use P-codes for spindle selection",
-    description: "Enable if P11, P12, etc. are used for spindle selection.  Disable if unique M-codes are used for spindle selection.",
-    group      : "preferences",
-    type       : "boolean",
-    value      : true,
-    scope      : "post"
-  },
   usePartCatcher: {
     title      : "Use part catcher",
     description: "Specifies whether part catcher code should be output.",
     group      : "configuration",
     type       : "boolean",
-    value      : true,
+    value      : false,
     scope      : "post"
   },
   runBarStop: {
@@ -160,6 +152,15 @@ properties = {
     type       : "spatial",
     range      : [0, 99999],
     value      : 0.75,
+    scope      : "post"
+  },
+  barStopX: {
+    title      : "Stop X Position",
+    description: "Defines the X position for the bar stop operation.  This is used when the bar stop operation is performed in a location other than the chuck (for example, with a bar feeder).",
+    group      : "Bar Stop",
+    type       : "spatial",
+    range      : [0, 99999],
+    value      : 0,
     scope      : "post"
   },
   partCatcherPosition: {
@@ -737,7 +738,7 @@ function getCode(code, spindle) {
   case "POLAR_INTERPOLATION_OFF":
     return 13.1;
   case "STOP_SPINDLE":
-    if (getProperty("useSpindlePcodes")) {
+    if (useSpindlePcodes()) {
       return 5;
     } else {
       switch (spindle) {
@@ -753,7 +754,7 @@ function getCode(code, spindle) {
   case "ORIENT_SPINDLE":
     return (spindle == SPINDLE_MAIN) ? 19 : 119;
   case "START_SPINDLE_CW":
-    if (getProperty("useSpindlePcodes")) {
+    if (useSpindlePcodes()) {
       return (getProperty("reverseSpindle") && spindle == SPINDLE_SUB) ? 4 : 3;
     } else {
       switch (spindle) {
@@ -767,7 +768,7 @@ function getCode(code, spindle) {
     }
     break;
   case "START_SPINDLE_CCW":
-    if (getProperty("useSpindlePcodes")) {
+    if (useSpindlePcodes()) {
       return (getProperty("reverseSpindle") && spindle == SPINDLE_SUB) ? 3 : 4;
     } else {
       switch (spindle) {
@@ -917,6 +918,10 @@ function formatComment(text) {
 */
 function writeComment(text) {
   writeln(formatComment(text));
+}
+
+function useSpindlePcodes() {
+  return getProperty("machineModel") == "PUMA_2600SY";
 }
 
 function getB(abc, section) {
@@ -1085,35 +1090,71 @@ function startUpBlock() {
   // Start Up Block - Operator needs to set L2P1Z and L2P2Z values, and may need to set X and Z values depending on machine configuration and starting position of the tool
   writeln (" ");
   writeln(formatSequenceNumber() + formatComment(localize("SETTING PARAMETERS")));
-  writeBlock(gFormat.format(40),gFormat.format(80));
-  writeBlock(gFormat.format(10)+" L2 P1 Z?? (SET THIS VALUE)");
-  writeBlock(gFormat.format(10)+" L2 P2 Z?? (SET THIS VALUE)");
-  writeBlock(gFormat.format(130)+" X?? Z?? (SET THIS VALUE)");
-  writeBlock(gMotionModal.format(30),  "U" + xFormat.format(0), "W" + zFormat.format(0));
-  writeBlock(gFormat.format(28), "V" + yFormat.format(0), "B0");
-  writeln (" ");
+  writeBlock(gFormat.format(21), gFormat.format(40), gFormat.format(80), gFormat.format(18));
+
+  if (getProperty("machineModel") == "PUMA_2500SY") {
+    writeBlock(gFormat.format(10)+" L2 P0 Z0");
+    writeBlock(gFormat.format(40),gFormat.format(80));
+    writeBlock(gFormat.format(10)+" L2 P1 Z?? (SET THIS VALUE)");
+    writeBlock(gFormat.format(10)+" L2 P2 Z?? (SET THIS VALUE)");
+    writeBlock(gFormat.format(130)+" X?? Z?? (SET THIS VALUE)");
+    writeBlock(gFormat.format(28), "V" + yFormat.format(0), "B0");
+    writeBlock(gMotionModal.format(30),  "U" + xFormat.format(0), "W" + zFormat.format(0));
+    writeBlock(mFormat.format(24));
+    writeBlock(mFormat.format(11));    
+  } else if (getProperty("machineModel") == "PUMA_2600SY") {
+    writeBlock(gFormat.format(10)+" L2 P0 X0 Z0");
+    writeBlock(gFormat.format(40),gFormat.format(80));
+    writeBlock(gFormat.format(10)+" L2 P1 Z?? (SET THIS VALUE)");
+    writeBlock(gFormat.format(10)+" L2 P2 Z?? (SET THIS VALUE)");
+    writeBlock(gFormat.format(130)+" X?? Z?? (SET THIS VALUE)");
+    writeBlock(gFormat.format(28), "U" + xFormat.format(0),"V" + yFormat.format(0));
+    writeBlock(gMotionModal.format(30), "W" + zFormat.format(0));
+    writeBlock(mFormat.format(34));
+    writeBlock(mFormat.format(1));
+  }
+    writeln (" ");
 }
 function runBarStop() {
   if (getProperty("runBarStop",true)) {
       var safeZ = getProperty("barSafeZ", 0);
       var stopZ = getProperty("barStopZ", 0);
+      var stopX = getProperty("barStopX", 0);
     writeBlock(" ");
     writeln(formatSequenceNumber() + formatComment(localize("BAR STOP CYCLE")));
-    writeBlock(gFormat.format(40),gFormat.format(80),gFormat.format(99),gFormat.format(54),gFormat.format(18));
-    writeBlock(gMotionModal.format(30),  "U" + xFormat.format(0), "W" + zFormat.format(0));
-    writeBlock(gFormat.format(28), bOutput.format(0), "V" + yFormat.format(0));
-    writeBlock(mFormat.format(5) +"P11")
-    writeBlock("T" + toolFormat.format(getProperty("barToolStop")));
-    writeBlock(mFormat.format(getCode("INTERFERENCE_CHECK_OFF", SPINDLE_MAIN)));
-    writeBlock(gFormat.format(0) + zOutput.format(safeZ));
-    writeBlock(xOutput.format(0));
-    writeBlock(zOutput.format(stopZ));
-    writeBlock(" ");
-    writeBlock("M00(PULL TO STOP)");
-    writeBlock(" ");
-    writeBlock(gFormat.format(0) + zOutput.format(25));
-     writeBlock(gMotionModal.format(30),  "U" + xFormat.format(0), "W" + zFormat.format(0));
-    writeBlock("M01");
+    if (getProperty("machineModel") == "PUMA_2500SY") {
+      writeBlock(gFormat.format(40),gFormat.format(80),gFormat.format(99),gFormat.format(54),gFormat.format(18));
+      writeBlock(gFormat.format(30),  "U" + xFormat.format(0), "W" + zFormat.format(0));
+      writeBlock(gFormat.format(28), "B0", "V" + yFormat.format(0));
+      writeBlock("T" + toolFormat.format(getProperty("barToolStop")));
+      writeBlock(mFormat.format(getCode("INTERFERENCE_CHECK_OFF", SPINDLE_MAIN)));
+      writeBlock(gFormat.format(0) + zOutput.format(safeZ));
+      writeBlock(xOutput.format(stopX/2) + zOutput.format(stopZ));
+      writeBlock(mFormat.format(31));
+      writeBlock(mFormat.format(69));
+      writeBlock(mFormat.format(51));
+      writeBlock(gFormat.format(4) + "U10");
+      writeBlock(mFormat.format(68));
+      writeBlock(gFormat.format(4) + "U2");
+      writeBlock(gFormat.format(0) + zOutput.format(safeZ));
+      writeBlock(gMotionModal.format(30),  "U" + xFormat.format(0), "W" + zFormat.format(0));
+      writeBlock("M01");
+    } else if (getProperty("machineModel") == "PUMA_2600SY") {
+      writeBlock(gFormat.format(1998), sOutput.format(getSection(0).spindle == SPINDLE_MAIN ? 1 : 2));
+      writeBlock(gFormat.format(40),gFormat.format(80),gFormat.format(99),gFormat.format(54),gFormat.format(18));
+      writeBlock(gFormat.format(30),  "U" + xFormat.format(0), "W" + zFormat.format(0));
+      writeBlock(gFormat.format(28), "B0", "V" + yFormat.format(0));
+      writeBlock("T" + toolFormat.format(getProperty("barToolStop")));
+      writeBlock(mFormat.format(getCode("INTERFERENCE_CHECK_OFF", SPINDLE_MAIN)));
+      writeBlock(gFormat.format(0) + xOutput.format(stopX/2) + zOutput.format(safeZ));
+      writeBlock(zOutput.format(stopZ));
+      writeBlock(" ");
+      writeBlock("M00(PULL TO STOP)");
+      writeBlock(" ");
+      writeBlock(gFormat.format(0) + zOutput.format(safeZ));
+      writeBlock(gFormat.format(30),  "U" + xFormat.format(0), "W" + zFormat.format(0));
+      writeBlock("M01");
+    }
   }
 }
 
@@ -1121,7 +1162,7 @@ function onOpen() {
   if (getProperty("useRadius")) {
     maximumCircularSweep = toRad(90); // avoid potential center calculation errors for CNC
   }
-  if (!getProperty("useSpindlePcodes")) {
+  if (!useSpindlePcodes()) {
     spOutput.disable();
   }
 
@@ -2092,8 +2133,10 @@ function onSection() {
   } else {
     writeComment(comment);
   }
-
-  // invert axes for secondary spindle
+  if (getProperty("machineModel") == "PUMA_2600SY" && insertToolCall) {
+writeBlock(gFormat.format(1998), sOutput.format(getSpindle(PART) == SPINDLE_MAIN ? 1 : 2));
+   }
+    // invert axes for secondary spindle
   invertAxes(getSpindle(PART) == SPINDLE_SUB, false); // polar mode has not been enabled yet
 
   // Position all axes at home
