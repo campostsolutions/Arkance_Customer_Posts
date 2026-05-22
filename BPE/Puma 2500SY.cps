@@ -316,6 +316,14 @@ properties = {
     value      : 0,
     scope      : "post"
   },
+  cleanSubSpindle: {
+    title      : "Clean sub-spindle",
+    description: "Enable to output a cleaning routine for the sub-spindle before part transfer.",
+    group      : "preferences",
+    type       : "boolean",
+    value      : false,
+    scope      : "post"
+  },
   homeMethodZ: {
     title      : "Move to Z-home position",
     description: "Specifies the method to use when positioning the Z-axis to its home position.  WCS positions in the active work coordinate system.",
@@ -398,7 +406,7 @@ properties = {
       {title:"G133", id:"g133"},
       {title:"Disabled", id:"false"}
     ],
-    value: "true",
+    value: "g133",
     scope: "post"
   },
   useSimpleThread: {
@@ -413,14 +421,6 @@ properties = {
     title      : "Position in Y for axial drilling",
     description: "Positions in Y for axial drilling options when it can instead of using the C-axis.",
     group      : "preferences",
-    type       : "boolean",
-    value      : false,
-    scope      : "post"
-  },
-  useG400: {
-    title      : "Use G400 for milling tools",
-    description: "Enable to output the G400 compensation block with milling/drilling operations. This option is not supported for the Puma 2500SY/2600SY models.",
-    group      : "multiAxis",
     type       : "boolean",
     value      : false,
     scope      : "post"
@@ -482,21 +482,13 @@ properties = {
     values     : [
       {title:"Machine default", id:"default"},
       {title:"Disabled", id:"false"},
-      {title:"Main", id:"main"},
-      {title:"Lower turret", id:"lower"},
-      {title:"Both", id:"both"}
+      {title:"Main", id:"main"}
+      //{title:"Lower turret", id:"lower"},
+      //{title:"Both", id:"both"}
     ],
     value: "default",
     scope: "post"
   },
-  useTCP: {
-    title      : "Use TCP (G700) mode",
-    description: "Enable to use G700 Tool Center Point programming in multi-axis operations. This option is not supported for the Puma 2500SY/2600SY models.",
-    group      : "multiAxis",
-    type       : "boolean",
-    value      : false,
-    scope      : "post"
-  }
 };
 
 groupDefinitions = {
@@ -603,7 +595,7 @@ var mTappingModal = createOutputVariable({}, mFormat);
 
 // fixed settings
 var firstFeedParameter = 100;
-var airCleanChuck = true; // use air to clean off chuck at part transfer and part eject
+var airCleanChuck = false; // use air to clean off chuck at part transfer and part eject
 
 // defined in defineMachine
 var turret1GotYAxis;
@@ -660,6 +652,7 @@ var currentFeedId;
 var previousSpindle = SPINDLE_MAIN;
 var activeSpindle = SPINDLE_MAIN;
 var partCutoff = false;
+var partOffZPosition;
 var transferType;
 var transferUseTorque;
 var showSequenceNumbers;
@@ -956,8 +949,6 @@ function defineMachine() {
     gotPolarInterpolation = true; // specifies if the machine has XY polar interpolation capabilities
     gotDoorControl = false;
     useCAxisSelectWithTurning = false;
-    setProperty("useG400", false);
-    setProperty("useTCP", false);
     useMultiAxisFeatures = true;
     useExtendedOffsets = getProperty("useExtendedOffsets") == "default" ? "false" : getProperty("useExtendedOffsets");
   } else {
@@ -1609,7 +1600,6 @@ function cancelWorkPlane() {
 function getTCP(abc) {
   tcp = (gotBAxis && activeTurret != 2) &&
     (machineState.axialCenterDrilling ||
-    // (getProperty("useG400") && (Math.abs(bFormat.getResultingValue(abc.y)) == 90)) ||
     (machineState.usePolarInterpolation || machineState.usePolarCoordinates));
   return tcp;
 }
@@ -1617,7 +1607,7 @@ function getTCP(abc) {
 // determines if G368 is used
 function useG368(abc) {
   if ((gotBAxis && (activeTurret != 2)) && (abc.y != 0) && !bAxisIsManual) {
-    if (!(getProperty("useG400") && ((bFormat.getResultingValue(abc.y) == 0) || (Math.abs(bFormat.getResultingValue(abc.y)) == 90)))) {
+    if ((bFormat.getResultingValue(abc.y) == 0) || (Math.abs(bFormat.getResultingValue(abc.y)) == 90)) {
       return true;
     }
   }
@@ -1658,7 +1648,7 @@ function setWorkPlane(abc) {
         );
       }
     } else {
-      if (getProperty("useG400") && ((bFormat.getResultingValue(abc.y) == 0) || (Math.abs(bFormat.getResultingValue(abc.y)) == 90))) {
+      if ((bFormat.getResultingValue(abc.y) == 0) || (Math.abs(bFormat.getResultingValue(abc.y)) == 90)) {
         if (currentWorkPlaneABC == undefined || abcFormat.areDifferent(abc.y, currentWorkPlaneABC.y)) {
           setSpindleOrientationMilling(abc);
         }
@@ -1680,19 +1670,13 @@ function setWorkPlane(abc) {
       }
     }
   } else {
-    if (getProperty("useG400") && (activeTurret != 2)) {
-      setSpindleOrientationMilling(abc);
-      if ((getSpindle(TOOL) == SPINDLE_LIVE) && machineConfiguration.isMachineCoordinate(2)) {
-        writeBlock(gMotionModal.format(0), cOutput.format(abc.z));
-      }
-    } else {
       writeBlock(
         gMotionModal.format(0),
         conditional(machineConfiguration.isMachineCoordinate(0), aOutput.format(abc.x)),
         conditional(machineConfiguration.isMachineCoordinate(1), bFormat.format(abc.y)),
         conditional(machineConfiguration.isMachineCoordinate(2), cOutput.format(abc.z))
       );
-    }
+    
   }
 
   if (!machineState.usePolarInterpolation && !machineState.usePolarCoordinates && !currentSection.isMultiAxis() &&
@@ -1770,7 +1754,7 @@ function getWorkPlaneMachineABC(section, workPlane) {
     setRotation(W); // TCP mode
   } else {
     if (true) {
-      var tempABC = (getProperty("useG400") && (Math.abs(bFormat.getResultingValue(abc.y)) == 90)) ?
+      var tempABC = (Math.abs(bFormat.getResultingValue(abc.y)) == 90) ?
         new Vector(abc.x, 0, abc.z) : new Vector(abc.x, (useMultiAxisFeatures ? abc.y : 0), abc.z);
       // Use for a Z-axis orientation rather than an X-axis orientation with a B-axis
       // Other changes are required when not using G368 for this operation
@@ -1878,29 +1862,13 @@ function getBAxisOrientationTurning(section) {
 }
 
 function setSpindleOrientationMilling(abc) {
-  if (getProperty("useG400")) {
-    var J;
-    switch (getSpindle(TOOL)) {
-    case SPINDLE_MAIN:
-      J = 1;
-      break;
-    case SPINDLE_SUB:
-      J = 2;
-      break;
-    case SPINDLE_LIVE:
-      J = 0;
-      break;
-    }
-    bOutput.reset();
-    writeBlock(gFormat.format(400), bOutput.format(getB(abc, currentSection)), "J" + spatialFormat.format(J));
-    writeBlock(mFormat.format(101)); // unclamp B-axis after G400 - per manual
-  } else {
+
     if (gWCSModal.getCurrent() != 369 && !bAxisIsManual) {
       writeBlock(gFormat.format(369));
     }
     bOutput.reset();
     writeBlock(gMotionModal.format(0), bOutput.format(getB(abc, currentSection)));
-  }
+  
 }
 
 function getSpindle(whichSpindle) {
@@ -3235,7 +3203,9 @@ function onCycle() {
     if (!gotSecondarySpindle) {
       error(localize("Secondary spindle is not available."));
     }
-
+  if (getProperty("cleanSubSpindle") && (cycleType == "secondary-spindle-grab")) {
+    cleansub()
+  }
     writeln("");
     if (hasParameter("operation-comment")) {
       var comment = getParameter("operation-comment");
@@ -3267,12 +3237,14 @@ function onCycle() {
 
     switch (cycleType) {
     case "secondary-spindle-grab":
+      partOffZPosition = getPartOffZPosition();
+
       onCommand(COMMAND_COOLANT_OFF);
       // Activate part catcher for part cutoff section
       if (getProperty("usePartCatcher") && partCutoff && currentSection.partCatcher) {
         engagePartCatcher(true);
       }
-      writeBlock(mFormat.format(getCode("INTERLOCK_BYPASS", getSecondarySpindle())), formatComment("INTERLOCK BYPASS"));
+     // writeBlock(mFormat.format(getCode("INTERLOCK_BYPASS", getSecondarySpindle())), formatComment("INTERLOCK BYPASS"));
       clampChuck(getSecondarySpindle(), UNCLAMP);
       onDwell(cycle.dwell);
       gSpindleModeModal.reset();
@@ -3312,16 +3284,18 @@ function onCycle() {
       }
 
       // clean out chips
-      if (airCleanChuck) {
+      /*if (airCleanChuck) {
         writeBlock(mFormat.format(getCode("AIR_BLAST_ON", SPINDLE_MAIN)), formatComment("CLEAN OUT CHIPS"));
         writeBlock(mFormat.format(getCode("AIR_BLAST_ON", SPINDLE_SUB)));
         onDwell(5.5);
         writeBlock(mFormat.format(getCode("AIR_BLAST_OFF", SPINDLE_MAIN)));
         writeBlock(mFormat.format(getCode("AIR_BLAST_OFF", SPINDLE_SUB)));
-      }
+      }*/
 
       writeBlock(mInterferModal.format(getCode("INTERFERENCE_CHECK_OFF", getSpindle(PART))));
-
+      if (partOffZPosition != undefined) {
+        writeBlock(gMotionModal.format(0),gFormat.format(54),zOutput.format(partOffZPosition));
+      }
       // need to orientate spindle after cleaning out chips, since spindles rotate during coolant air
       transferOrientation = 0;
       if (cycle.stopSpindle) {
@@ -3334,6 +3308,7 @@ function onCycle() {
         forceTurningMode = true;
       }
       gMotionModal.reset();
+      
       moveSubSpindle(RAPID, cycle.feedPosition, 0, cycle.useMachineFrame, "", true);
 
       if (transferUseTorque) {
@@ -3405,7 +3380,26 @@ function onCycle() {
 var saveShowSequenceNumbers;
 var pathBlockNumber = {start:0, end:0};
 var isCannedCycle = false;
-
+function cleansub() {
+  // Pre SUb spindle grab or return, ensure sub is clean and empty before continuing with transfer
+  onCommand(COMMAND_STOP_SPINDLE);
+  writeln (" ");
+  writeln(formatSequenceNumber() + formatComment("CLEAN SUB.CHUCK"));
+  writeBlock(gFormat.format(40),gFormat.format(80),gFormat.format(99),gFormat.format(54),gFormat.format(18));
+  writeBlock(gMotionModal.format(30),  "U" + xFormat.format(0), "W" + zFormat.format(0));
+  writeBlock(gFormat.format(28), bOutput.format(0), "V" +yOutput.format(0));
+  writeBlock(mFormat.format(135));
+  writeToolCall(tool);
+  writeBlock(mFormat.format(110));
+ writeBlock(gMotionModal.format(0), gFormat.format(28), "H" + abcFormat.format(0));
+  writeBlock(gFormat.format(50), cOutput.format(0));
+  writeBlock(mFormat.format(131));
+  writeBlock(mFormat.format(169));
+  writeBlock(mFormat.format(0));
+  writeComment("TAKE FINISHED PART OUT OF SUB");
+  writeComment("CLEAN SUB & MAIN BORE");
+  writeComment("CLOSE DOOR & CYCLE START");
+}
 function onCyclePath() {
   saveShowSequenceNumbers = showSequenceNumbers;
   isCannedCycle = true;
@@ -4371,6 +4365,20 @@ function getSpindleTransferCodes(_transferType) {
   return transferCodes;
 }
 
+function getPartOffZPosition() {
+  var numberOfSections = getNumberOfSections();
+  for (var i = getCurrentSectionId() + 1; i < numberOfSections; ++i) {
+    var section = getSection(i);
+    var strategy = section.getParameter("operation-strategy", "");
+    if (strategy == "turningPart") {
+      return section.getInitialPosition().z;
+    } else if (strategy == "turningSecondarySpindleReturn" || strategy == "turningSecondarySpindlePull" || strategy == "turningToolCall") {
+      break;
+    }
+  }
+  return undefined;
+}
+
 function getG17Code() {
   return (machineState.usePolarInterpolation || !gotYAxis) ? 18 : 17;
 }
@@ -4425,11 +4433,11 @@ function ejectPart() {
   }
 
   // clean out chips
-  if (airCleanChuck) {
+  /*if (airCleanChuck) {
     writeBlock(mFormat.format(getCode("AIR_BLAST_ON", spindle)));
     onDwell(2.5);
     writeBlock(mFormat.format(getCode("AIR_BLAST_OFF", spindle)));
-  }
+  }*/
   writeBlock(mFormat.format(getCode("STOP_SPINDLE", spindle)), spOutput.format(getCode("SELECT_SPINDLE", spindle)));
   if (getProperty("autoEject") == "flush") {
     setCoolant(COOLANT_OFF);
@@ -4534,7 +4542,7 @@ function onSectionEnd() {
     engagePartCatcher(false);
   }
   if (getProperty("cutoffConfirmation") != "false" && partCutoff) {
-    writeBlock(gFormat.format(getProperty("cutoffConfirmation") == "true" ? 350 : 133), formatComment("CONFIRM CUTOFF"));
+    writeBlock(gFormat.format(getProperty("cutoffConfirmation") == "true" ? 350 : 133), "B1",formatComment("CONFIRM CUTOFF"));
     onDwell(0.5);
   }
   if (partCutoff) {
