@@ -285,7 +285,7 @@ var taperFormat = createFormat({ decimals: 1, scale: DEG });
 var arFormat = createFormat({ decimals: 3, scale: DEG });
 var integerFormat = createFormat({ decimals: 0 });
 
-var motionOutputTolerance = 0.0001;
+var motionOutputTolerance = 0.05;
 var xOutput = createOutputVariable({ onchange: function () { state.retractedX = false; }, prefix: "X", tolerance: motionOutputTolerance }, xyzFormat);
 var yOutput = createOutputVariable({ onchange: function () { state.retractedY = false; }, prefix: "Y", tolerance: motionOutputTolerance }, xyzFormat);
 var zOutput = createOutputVariable({ onchange: function () { state.retractedZ = false; }, prefix: "Z", tolerance: motionOutputTolerance }, xyzFormat);
@@ -373,7 +373,7 @@ var settings = {
     eulerConvention: undefined, // specifies the euler convention (ie EULER_XYZ_R), set to undefined to use machine angles for TWP commands ('undefined' requires machine configuration)
     eulerCalculationMethod: "standard", // ('standard' / 'machine') 'machine' adjusts euler angles to match the machines ABC orientation, machine configuration required
     cancelTiltFirst: false, // cancel tilted workplane prior to WCS (G54-G59) blocks
-    forceMultiAxisIndexing: false, // force multi-axis indexing for 3D programs
+    forceMultiAxisIndexing: true, // force multi-axis indexing for 4+1 programs
     optimizeType: OPTIMIZE_AXIS // can be set to OPTIMIZE_NONE, OPTIMIZE_BOTH, OPTIMIZE_TABLES, OPTIMIZE_HEADS, OPTIMIZE_AXIS. 'undefined' uses legacy rotations
   },
   subprograms: {
