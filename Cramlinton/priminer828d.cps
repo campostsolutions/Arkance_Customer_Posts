@@ -285,7 +285,7 @@ var taperFormat = createFormat({ decimals: 1, scale: DEG });
 var arFormat = createFormat({ decimals: 3, scale: DEG });
 var integerFormat = createFormat({ decimals: 0 });
 
-var motionOutputTolerance = 0.05;
+var motionOutputTolerance = 0.01;
 var xOutput = createOutputVariable({ onchange: function () { state.retractedX = false; }, prefix: "X", tolerance: motionOutputTolerance }, xyzFormat);
 var yOutput = createOutputVariable({ onchange: function () { state.retractedY = false; }, prefix: "Y", tolerance: motionOutputTolerance }, xyzFormat);
 var zOutput = createOutputVariable({ onchange: function () { state.retractedZ = false; }, prefix: "Z", tolerance: motionOutputTolerance }, xyzFormat);
