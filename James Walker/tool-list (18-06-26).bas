@@ -120,12 +120,15 @@ End If
                 seq = "N" & CStr(seq_cnt) & " "
             End If
 
-          If InStr(post_upper, "MAZAK-INTEGREX-I") > 0 Then
+    If InStr(post_upper, "MAZAK-INTEGREX-I") > 0 Then
 
-    ' Mazak format
+    ' Mazak format (Stripping "-ROTARY" from the tool name)
+    Dim clean_tool_name As String
+    clean_tool_name = Replace(UCase(Tl_Mp_2.Tool.Name), "-ROTARY", "")
+
     Print #2, Cmt_Chr_S & "T" & _
         CStr$(Tl_Mp_2.ToolNumber) & " - " & _
-        UCase(Tl_Mp_2.Tool.Name) & Cmt_Chr_E
+        clean_tool_name & Cmt_Chr_E
 
 Else
 
