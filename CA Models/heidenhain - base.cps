@@ -150,7 +150,7 @@ properties = {
       {title:"Off", id:"-1"},
       {title:"Automatic", id:"9999"}
     ],
-    value: "9999",
+    value: "-1",
     scope: "post"
   },
   toolAsName: {
@@ -256,8 +256,8 @@ var settings = {
       {id:COOLANT_FLOOD, on:8, off:9},
       {id:COOLANT_MIST, on:25, off:9},
       {id:COOLANT_THROUGH_TOOL, on:7, off:9},
-      {id:COOLANT_AIR, on:25, off:9},
-      {id:COOLANT_AIR_THROUGH_TOOL,on:26, off:9},
+      {id:COOLANT_AIR},
+      {id:COOLANT_AIR_THROUGH_TOOL},
       {id:COOLANT_SUCTION},
       {id:COOLANT_FLOOD_MIST},
       {id:COOLANT_FLOOD_THROUGH_TOOL},
@@ -485,9 +485,8 @@ function setSmoothing(mode) {
 }
 
 function onSection() {
- //var forceSectionRestart = optionalSection && !currentSection.isOptional();
- var forceSectionRestart = true; // force section restart for optional sections to avoid issues with tool changes and work offsets 
- optionalSection = currentSection.isOptional();
+  var forceSectionRestart = optionalSection && !currentSection.isOptional();
+  optionalSection = currentSection.isOptional();
   var insertToolCall = isToolChangeNeeded(getProperty("toolAsName") ? "description" : "number") || forceSectionRestart;
   var newWorkOffset = isNewWorkOffset() || forceSectionRestart;
   var newWorkPlane = isNewWorkPlane() || forceSectionRestart || (typeof defineWorkPlane == "function" &&
@@ -517,7 +516,6 @@ function onSection() {
       onCommand(COMMAND_STOP_SPINDLE);
     }
     writeToolCall(tool, insertToolCall);
-    onCommand(COMMAND_OPTIONAL_STOP); // M1 after tool change before spindle start
     if (tool.type != TOOL_PROBE) {
       onCommand(tool.clockwise ? COMMAND_SPINDLE_CLOCKWISE : COMMAND_SPINDLE_COUNTERCLOCKWISE);
     }
@@ -635,13 +633,10 @@ function onCommand(command) {
     return;
   case COMMAND_LOAD_TOOL:
     forceSpindleSpeed = false;
-    var dl = 0;
-    var dr = 0;
     writeToolBlock(
       "TOOL CALL", getProperty("toolAsName") ? "\"" + (tool.description.toUpperCase()) + "\"" : tool.number,
       getSpindleAxisLetter(machineConfiguration.getSpindleAxis()),
-      tool.type == TOOL_PROBE ? getProperty("outputSpindleSpeedForProbing") ? sOutput.format(50) : "" : sOutput.format(spindleSpeed),
-      "DL+" + dl, "DR+" + dr
+      tool.type == TOOL_PROBE ? getProperty("outputSpindleSpeedForProbing") ? sOutput.format(50) : "" : sOutput.format(spindleSpeed)
     );
     writeComment(tool.comment);
     onCommand(COMMAND_TOOL_MEASURE);
@@ -1628,6 +1623,9 @@ function writeToolCall(tool, insertToolCall) {
       onCommand(COMMAND_STOP);
       writeComment("MANUAL TOOL CHANGE TO T" + toolFormat.format(tool.number));
     } else {
+      if (!isFirstSection() && getProperty("optionalStop") && insertToolCall) {
+        onCommand(COMMAND_OPTIONAL_STOP);
+      }
       onCommand(COMMAND_LOAD_TOOL);
     }
   });
@@ -2029,47 +2027,6 @@ properties.writeTools = {
   value      : true,
   scope      : "post"
 };
-function getHeaderActiveWorkplaneName() {
-  if (getNumberOfSections() <= 0) {
-    return undefined;
-  }
-  var section = getSection(0);
-  if (settings.workPlaneMethod.useTiltedWorkplane) {
-    if (twpMethod == PLANE_SPATIAL) {
-      return "PLANE SPATIAL";
-    }
-    if (twpMethod == CYCLE_19) {
-      return "CYCLE 19";
-    }
-    return "TILTED WORKPLANE";
-  }
-
-  var forward = getForwardDirection(section).getNormalized();
-  if (isSameDirection(forward, new Vector(0, 0, 1))) {
-    return "XY";
-  }
-  if (isSameDirection(forward, new Vector(0, 1, 0))) {
-    return "XZ";
-  }
-  if (isSameDirection(forward, new Vector(1, 0, 0))) {
-    return "YZ";
-  }
-  if (isSameDirection(forward, new Vector(0, 0, -1))) {
-    return "XY (INVERTED)";
-  }
-  if (isSameDirection(forward, new Vector(0, -1, 0))) {
-    return "XZ (INVERTED)";
-  }
-  if (isSameDirection(forward, new Vector(-1, 0, 0))) {
-    return "YZ (INVERTED)";
-  }
-  return "CUSTOM";
-}
-
-function getHeaderSetupName() {
-    writeComment(" Setup Name: " + getGlobalParameter("job-description"));
-}
-
 function writeProgramHeader() {
   // dump machine configuration
   var vendor = machineConfiguration.getVendor();
@@ -2125,11 +2082,6 @@ function writeProgramHeader() {
         }
       }
     }
-  }
-
-  var setupName = getHeaderSetupName();
-  if (setupName) {
-    writeComment("Setup: " + setupName);
   }
 }
 // <<<<< INCLUDED FROM include_files/writeProgramHeader.cpi
@@ -3553,11 +3505,7 @@ function writeProbeCycle(cycle, x, y, z) {
   var Q274 = formatQword("Q274", xyzFormat.format(y), "CENTER IN 2ND AXIS");
   var Q279 = cycle.hasPositionalTolerance ? formatQword("Q279", xyzFormat.format(tolerancePosition), "TOLERANCE 1ST CENTER") : "";
   var Q280 = cycle.hasPositionalTolerance ? formatQword("Q280", xyzFormat.format(tolerancePosition), "TOLERANCE 2ND CENTER") : "";
-  var measuringLog = cycle.printResults;
-  if (probeGeometry && (cycle.printResults > 0)) {
-    measuringLog = 2; // print probe geometry results on screen
-  }
-  var Q281 = formatQword("Q281", xyzFormat.format(measuringLog), "MEASURING LOG");
+  var Q281 = formatQword("Q281", xyzFormat.format(cycle.printResults), "MEASURING LOG");
   var Q288 = formatQword("Q288", xyzFormat.format(surfaceCoordinateX + probeToleranceSize), "MAXIMUM DIMENSION");
   var Q289 = formatQword("Q289", xyzFormat.format(surfaceCoordinateX - probeToleranceSize), "MINIMUM DIMENSION");
   var Q301 = formatQword("Q301", xyzFormat.format(1), "MOVE TO CLEARANCE");
