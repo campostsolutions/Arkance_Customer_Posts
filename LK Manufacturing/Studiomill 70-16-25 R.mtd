@@ -1,0 +1,95 @@
+<?xml version="1.0" ?>
+
+
+<!-- Studiomill 70-16-25 R -->
+<machine xmlns="x-schema:PowermillMachineTool" POST="Studiomill.*">
+
+  <!-- Attachment points -->
+  <table_attach_point PART="table" X="0" Y="0" Z="0" />
+  <head_attach_point PART="head" X="0" Y="159" Z="450.5" I="0" J="-1" K="0" />
+  
+  <!-- Static items -->
+  <machine_part>
+    <model_list>
+	  <dmt_file>
+	    <path FILE="Machine parts/Studiomill_x-rail-above-floor.dmt" />
+		<rgb R="64" G="64" B="64" />
+	  </dmt_file>
+	</model_list>
+  </machine_part>
+  
+  <!-- The table -->
+  <machine_part NAME="table" />
+
+  <!-- The head -->
+  <machine_part>
+    <axis>
+	  <control_info ADDRESS="X" MIN="-3500" MAX="3500" />
+	  <simple_linear I="1" J="0" K="0" />
+	</axis>
+	<model_list>
+	  <dmt_file>
+	    <path FILE="Machine parts/Studiomill_z-column.dmt" />
+		<rgb R="64" G="64" B="64" />		
+	  </dmt_file>
+	  <dmt_file>
+	    <path FILE="Machine parts/Studiomill_z-column2.dmt" />
+		<rgb R="230" G="230" B="230" />
+	  </dmt_file>
+	</model_list>
+	<machine_part>
+	  <axis>
+	    <control_info ADDRESS="Z" HOME="2540" MIN="0" MAX ="2540" />
+		<simple_linear I="0" J="0" K="1" />
+	  </axis>
+	  <model_list>
+	    <dmt_file>
+		  <path FILE="Machine parts/Studiomill_z-carriage.dmt" />
+		  <rgb R="230" G="230" B="230" />
+		</dmt_file>
+	  </model_list>
+	  <machine_part>
+	    <axis>
+		  <control_info ADDRESS="Y" MIN="0" MAX="1626" />
+		  <simple_linear I="0" J="1" K="0" />
+		</axis>
+		<model_list>
+		  <dmt_file>
+		    <path FILE="Machine parts/Studiomill_y-arm.dmt" />
+			<rgb R="230" G="230" B="230" />
+		  </dmt_file>
+		</model_list>
+		<machine_part>
+		  <axis>
+		    <control_info ADDRESS="B" MIN="-180" MAX="180" />
+			<simple_rotary X="-187" Y="0" Z="450.5" I="0" J="-1" K="0" />
+		  </axis>
+		  <model_list>
+		    <dmt_file>
+			  <path FILE="Machine parts/Studiomill_B-axis.dmt" />
+			  <rgb R="30" G="30" B="30" />
+			</dmt_file>
+		  </model_list>
+		  <machine_part>
+		    <axis>
+			  <control_info ADDRESS="A" MIN="-135" MAX="135" />
+			  <simple_rotary X="0" Y="0" Z="450.5" I="-1" J="0" K="0" />
+			</axis>
+			<model_list>
+			  <dmt_file>
+			    <path FILE="Machine parts/Studiomill_A-axis_spindle.dmt" />
+				<rgb R="30" G="30" B="30" />
+			  </dmt_file>
+			  <dmt_file>
+			    <path FILE="Machine parts/Studiomill_A-axis_spindle2.dmt" />
+				<rgb R="230" G="230" B="230" />
+			  </dmt_file>
+			</model_list>
+			<machine_part NAME="head" />
+		  </machine_part>
+		</machine_part>
+	  </machine_part>
+	</machine_part>
+  </machine_part>
+
+  </machine>
