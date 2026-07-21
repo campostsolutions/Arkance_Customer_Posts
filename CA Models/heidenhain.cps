@@ -469,7 +469,7 @@ function setSmoothing(mode) {
   if (mode == smoothing.isActive && (!mode || !smoothing.isDifferent) && !smoothing.force) {
     return; // return if smoothing is already active or is not different
   }
-  var scaleFactor = 1.3;
+  var scaleFactor = 1.0;
   var toleranceFormat = createFormat({decimals:4, forceSign:true, minimum:0.0001}); // smoothing cycle only supports 4 decimals
   if (mode) { // enable smoothing
     writeBlock("CYCL DEF 32.0", localize("TOLERANCE"));
@@ -2067,7 +2067,7 @@ function getHeaderActiveWorkplaneName() {
 }
 
 function getHeaderSetupName() {
-    writeComment(" Setup Name: " + getGlobalParameter("job-description"));
+    writeComment(" Output Workplane: " + getGlobalParameter("job-description"));
 }
 
 function writeProgramHeader() {
@@ -2129,7 +2129,7 @@ function writeProgramHeader() {
 
   var setupName = getHeaderSetupName();
   if (setupName) {
-    writeComment("Setup: " + setupName);
+    writeComment("Output Workplane: " + setupName);
   }
 }
 // <<<<< INCLUDED FROM include_files/writeProgramHeader.cpi
