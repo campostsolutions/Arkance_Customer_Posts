@@ -2067,7 +2067,10 @@ function getHeaderActiveWorkplaneName() {
 }
 
 function getHeaderSetupName() {
-    writeComment(" Output Workplane: " + getGlobalParameter("job-description"));
+  if (getNumberOfSections() <= 0) {
+    return undefined;
+  }
+  return getSection(0).workOffset;
 }
 
 function writeProgramHeader() {
